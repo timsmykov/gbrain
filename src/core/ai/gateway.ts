@@ -2245,6 +2245,7 @@ async function resolveExpansionProvider(modelStr: string): Promise<{ model: any;
   const { parsed, recipe } = resolveRecipe(modelStr);
   assertTouchpoint(recipe, 'expansion', parsed.modelId);
   const cfg = requireConfig();
+  assertLlmProviderAllowed(recipe, cfg, 'expansion');
 
   const cacheKey = `exp:${recipe.id}:${parsed.modelId}:${cfg.base_urls?.[recipe.id] ?? ''}`;
   const cached = _modelCache.get(cacheKey);
@@ -3138,6 +3139,7 @@ async function resolveChatProvider(modelStr: string): Promise<{ model: any; reci
   const { parsed, recipe } = resolveRecipe(modelStr);
   assertTouchpoint(recipe, 'chat', parsed.modelId);
   const cfg = requireConfig();
+  assertLlmProviderAllowed(recipe, cfg, 'chat');
 
   const cacheKey = `chat:${recipe.id}:${parsed.modelId}:${cfg.base_urls?.[recipe.id] ?? ''}`;
   const cached = _modelCache.get(cacheKey);
@@ -3191,6 +3193,27 @@ function instantiateChat(recipe: Recipe, modelId: string, cfg: AIGatewayConfig):
     }
     default:
       throw new AIConfigError(`Unknown implementation: ${(recipe as any).implementation}`);
+  }
+}
+
+/**
+ * Installation-level fail-closed policy for LLM traffic. Embeddings are
+ * intentionally separate: this guard covers every chat and expansion request
+ * before a provider client is created or any network request can start.
+ */
+export function assertLlmProviderAllowed(
+  recipe: Pick<Recipe, 'id'>,
+  cfg: Pick<AIGatewayConfig, 'env'>,
+  touchpoint: 'chat' | 'expansion',
+): void {
+  const configured = cfg.env.GBRAIN_LLM_ALLOWED_PROVIDERS?.trim();
+  if (!configured) return;
+  const allowed = new Set(configured.split(',').map((id) => id.trim().toLowerCase()).filter(Boolean));
+  if (!allowed.has(recipe.id.toLowerCase())) {
+    throw new AIConfigError(
+      `Gbrain ${touchpoint} provider "${recipe.id}" is blocked by GBRAIN_LLM_ALLOWED_PROVIDERS.`,
+      `Use the local OpenAI subscription proxy (${[...allowed].join(', ')}).`,
+    );
   }
 }
 

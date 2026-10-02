@@ -1,3 +1,4 @@
+import { applyDocumentTypeBoost } from '../hybrid.ts';
 /**
  * hybridSearch pipeline stages (refactor wave 1, W4 hybrid): fusion, structural expansion, rerank, identity tiers, return sizing and the main return.
  * Each stage reads the resolved request (HybridRequest, request.ts) and
@@ -168,6 +169,7 @@ export async function fuseArms(
     // v0.32.x search-lite: intent exact-match boost (entity/event intents).
     // No-op when boost factor is 1.0 (general intent or weighting disabled).
     await applyIdentityBoosts(req, fused);
+    applyDocumentTypeBoost(fused, query);
     fused.sort((a, b) => b.score - a.score);
   }
   return { fused, relaxedDropped, keywordArmConfidence, metadataBoostGate };

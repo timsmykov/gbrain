@@ -67,6 +67,15 @@ describe('parseRelationalQuery — archetypes', () => {
     expect(r!.seeds).toEqual(['alice']);
     expect(r!.direction).toBe('out');
   });
+
+  test('outgoing: which active projects does alice-example work on', () => {
+    const r = parseRelationalQuery('Which active projects does alice-example work on?');
+    expect(r).not.toBeNull();
+    expect(r!.kind).toBe('who_rel');
+    expect(r!.seeds).toEqual(['alice-example']);
+    expect(r!.linkTypes).toEqual(['works_on']);
+    expect(r!.direction).toBe('out');
+  });
 });
 
 describe('parseRelationalQuery — precision-first / no-match', () => {
@@ -124,6 +133,7 @@ describe('default bank emits only known link types (no drift)', () => {
       'who at acme leads payments',
       'what did alice invest in',
       'where does alice work',
+      'which active projects does alice-example work on',
     ];
     for (const q of queries) {
       const r = parseRelationalQuery(q);

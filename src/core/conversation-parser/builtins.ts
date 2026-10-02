@@ -813,6 +813,32 @@ export const BUILTIN_PATTERNS: readonly PatternEntry[] = [
   },
 
   {
+    id: 'markdown-heading-iso-turn',
+    origin: 'builtin',
+    regex:
+      /^#{2,3}\s+(User|Assistant|Human|System)\s+[-\u2013\u2014]\s+(\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?Z)\s*()$/,
+    captures: { speaker_group: 1, date_group: 2, text_group: 3 },
+    date_source: 'inline',
+    time_format: '24h',
+    timezone_policy: 'inline_utc',
+    multi_line: true,
+    score_continuations_as_body: true,
+    quick_reject: /^#{2,3}\s+(?:User|Assistant|Human|System)\s+[-\u2013\u2014]\s+\d{4}-\d{2}-\d{2}T/,
+    test_positive: [
+      '## User \u2014 2026-08-25T10:01:02.345Z',
+      '## Assistant - 2026-08-25T10:02:03Z',
+      '### System \u2013 2026-08-25T23:59:59.123456Z',
+    ],
+    test_negative: [
+      '## User',
+      '## Summary \u2014 2026-08-25T10:01:02Z',
+      '## Assistant \u2014 2026-08-25 10:02:03Z',
+      '#### User \u2014 2026-08-25T10:01:02Z',
+    ],
+    source_doc: 'Hermes native persisted session transcript with an ISO-8601 UTC role heading',
+  },
+
+  {
     id: 'markdown-heading-turn',
     origin: 'builtin',
     // gbrain transcript-ingest shape: a heading-only line ('## User' /

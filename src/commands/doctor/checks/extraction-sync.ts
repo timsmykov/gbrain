@@ -363,7 +363,12 @@ function collectMarkdownSlugs(root: string): Set<string> {
       if (e.name === '.git' || e.name === 'node_modules') continue;
       const childRel = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) stack.push(childRel);
-      else if (/\.mdx?$/i.test(e.name)) out.add(slugifyPath(childRel).toLowerCase());
+      else if (/\.mdx?$/i.test(e.name)) {
+        out.add(slugifyPath(childRel).toLowerCase());
+        // Exported legacy slugs can intentionally retain Unicode/punctuation that
+        // slugifyPath would normalize away. An exact <slug>.md path is file-backed.
+        out.add(childRel.replace(/\.mdx?$/i, '').replace(/\\/g, '/').toLowerCase());
+      }
       // #3766: code files are pages too (code-slug shape). Legacy code rows
       // backfilled by migration 25 carry page_kind='markdown' without a
       // type='code' re-stamp, so their slugs must count as file-backed or

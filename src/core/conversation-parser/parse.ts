@@ -176,6 +176,9 @@ function buildIso(
 
   // Pattern-specific date reconstruction.
   switch (entry.id) {
+    case 'markdown-heading-iso-turn': {
+      return match[2] ?? null;
+    }
     case 'telegram-text-export': {
       // groups: 1=speaker, 2=monthName, 3=day, 4=year, 5=hour, 6=min, 7=sec, 8=ampm
       const monthName = match[2];
