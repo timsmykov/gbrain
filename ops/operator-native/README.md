@@ -1,0 +1,11 @@
+# Native command scheduling
+
+These optional systemd templates invoke the upstream CLI directly. They implement no custom import, ranking, mutation, checkpoint, locking or success rules.
+
+For each explicitly approved local source, `gbrain-sync@SOURCE.timer` runs sync, stale embedding backfill and deterministic stale link/timeline extraction. Sync does not pull remote Git history, admits reviewed working-tree changes, and defers embeddings/extraction to the next two native commands. A failed command stops that run. The timer waits five minutes after completion, so long initial catch-up does not stack runs. `gbrain-sweep@SOURCE.timer` provides a bounded recent-page backstop.
+
+Prerequisites: the installed native CLI, a provider-aware environment launcher at `/usr/local/bin/gbrain`, valid source registration and canonical writer ownership, database/schema readiness, and an existing jobs supervisor when managed persistence is enabled. Set source IDs, intervals and resource limits for the deployment. Do not enable disconnected connector sources blindly. Review allowed working-tree files before admission. Archive old schedulers before enabling these templates.
+
+Validate the templates with `systemd-analyze verify` and verify two actual timer-fired cycles. Acceptance includes canonical readback after a changed file, stale non-null embeddings, source-scoped same-slug handling, write receipts and absence of failed cursors. A green service exit is not an entire-corpus quality claim. Read-only doctor diagnostics remain the upstream health authority; configured cloud providers may receive the text they process.
+
+Autopilot is an alternative scheduler, not an additional one. Its default cycle can pull Git and run wider phases. These templates deliberately keep the command sequence explicit. They do not enable paid enrichment, conversation capture, private external decision models or destructive consolidation.
