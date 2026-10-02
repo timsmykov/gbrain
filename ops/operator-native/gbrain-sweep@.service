@@ -3,6 +3,8 @@ Description=Bounded native GBrain maintenance for %i
 After=gbrain-postgres.service gbrain-jobs-supervisor.service
 
 [Service]
+User=root
+Environment=HOME=/root
 Type=oneshot
 EnvironmentFile=-/etc/gbrain/gbrain.env
 ExecStart=/usr/local/bin/gbrain sweep --once --source %i --budget-ms 5000 --batch-limit 20 --json

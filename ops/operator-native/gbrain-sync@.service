@@ -4,6 +4,8 @@ After=network-online.target gbrain-postgres.service gbrain-jobs-supervisor.servi
 Wants=network-online.target
 
 [Service]
+User=root
+Environment=HOME=/root
 Type=oneshot
 EnvironmentFile=-/etc/gbrain/gbrain.env
 ExecStart=/usr/local/bin/gbrain sync --source %i --no-pull --working-tree --no-embed --no-extract --json
