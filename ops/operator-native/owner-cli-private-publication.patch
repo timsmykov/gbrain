@@ -1,0 +1,16 @@
+--- a/gbrain-launcher
++++ b/gbrain-launcher
+@@ -31,6 +31,13 @@
+ unset _CALLER_GBRAIN_HOME
+ 
+ 
++# Trusted local commands may publish queued requests from the private owner MCP.
++# Match its private-page publication policy; captured caller authority still
++# fences public requests. HTTP serving keeps its explicit per-unit policy.
++if [[ "${1:-}" != "serve" || " ${*:2} " != *" --http "* ]]; then
++  export GBRAIN_REMOTE_PRIVATE_PAGES=1
++fi
++
+ export PATH="/opt/gbrain/app/bun:/usr/local/bin:/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+ 
+ if [[ ! -x "${REAL_BIN}" ]]; then

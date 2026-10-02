@@ -1,0 +1,15 @@
+[Unit]
+Description=Budgeted native GBrain atom extraction and salience maintenance for %i
+After=network-online.target gbrain-postgres.service gbrain-jobs-supervisor.service
+Wants=network-online.target
+
+[Service]
+User=root
+Environment=HOME=/root
+Type=oneshot
+EnvironmentFile=-/etc/gbrain/gbrain.env
+ExecStart=/usr/local/bin/gbrain dream --phase extract_atoms --phase recompute_emotional_weight --source %i --json
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle
+UMask=0077

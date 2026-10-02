@@ -1,0 +1,18 @@
+[Unit]
+Description=Native GBrain sync, embedding and link maintenance for %i
+After=network-online.target gbrain-postgres.service gbrain-jobs-supervisor.service
+Wants=network-online.target
+
+[Service]
+User=root
+Environment=HOME=/root
+Type=oneshot
+EnvironmentFile=-/etc/gbrain/gbrain.env
+ExecStart=/usr/local/bin/gbrain sync --source %i --no-pull --working-tree --retry-failed --no-embed --no-extract --json
+ExecStart=/usr/local/bin/gbrain embed --stale --source %i --include-null-signature --json
+ExecStart=/usr/local/bin/gbrain extract --stale --source-id %i --json
+TimeoutStartSec=45min
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+

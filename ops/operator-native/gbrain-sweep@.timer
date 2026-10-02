@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule bounded native GBrain maintenance for %i
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=10min
+RandomizedDelaySec=30s
+Unit=gbrain-sweep@%i.service
+
+[Install]
+WantedBy=timers.target
+
