@@ -1,0 +1,57 @@
+--- a/gbrain-offsite-backup.sh
++++ b/gbrain-offsite-backup.sh
+@@ -41,8 +41,15 @@
+ ARCHIVE_TMP="$ARCHIVE.tmp"
+ MANIFEST="$LOCAL_ROOT/gbrain-$STAMP.manifest.json"
+ REMOTE_LIST=""
++SNAPSHOT_KEEPER_PID=""
++SNAPSHOT_WRITE_FD=""
+ mkdir -m 0700 "$GENERATION_DIR"
+ cleanup() {
++  if [[ -n "$SNAPSHOT_WRITE_FD" ]]; then
++    printf '%s\n' '\q' >&"$SNAPSHOT_WRITE_FD" 2>/dev/null || true
++    exec {SNAPSHOT_WRITE_FD}>&-
++  fi
++  [[ -z "$SNAPSHOT_KEEPER_PID" ]] || wait "$SNAPSHOT_KEEPER_PID" 2>/dev/null || true
+   rm -f -- "$ARCHIVE_TMP"
+   [[ -z "$REMOTE_LIST" ]] || rm -f -- "$REMOTE_LIST"
+   [[ ! -d "$GENERATION_DIR" ]] || find "$GENERATION_DIR" -depth -delete
+@@ -87,12 +94,26 @@
+   mkdir -p "$GENERATION_DIR/design-source"
+   rsync -a --numeric-ids /root/hermes-workspace/design-style-library/gbrain_export "$GENERATION_DIR/design-source/"
+ fi
+-docker exec gbrain-postgres pg_dump -U "$GBRAIN_POSTGRES_USER" -d "$GBRAIN_POSTGRES_DB" --format=custom --no-owner --no-privileges > "$GENERATION_DIR/gbrain.dump"
++# Hold one read-only PostgreSQL snapshot for the dump and its count manifest.
++# Concurrent application writes continue; no global settings or write locks change.
++coproc GBRAIN_BACKUP_SNAPSHOT { docker exec -i gbrain-postgres psql -X -q -v ON_ERROR_STOP=1 -U "$GBRAIN_POSTGRES_USER" -d "$GBRAIN_POSTGRES_DB" -At -F,; }
++SNAPSHOT_KEEPER_PID="$GBRAIN_BACKUP_SNAPSHOT_PID"
++exec {SNAPSHOT_READ_FD}<&"${GBRAIN_BACKUP_SNAPSHOT[0]}"
++exec {SNAPSHOT_WRITE_FD}>&"${GBRAIN_BACKUP_SNAPSHOT[1]}"
++printf '%s\n' 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;' 'SELECT pg_export_snapshot();' >&"$SNAPSHOT_WRITE_FD"
++read -r -t 30 DB_SNAPSHOT <&"$SNAPSHOT_READ_FD"
++[[ "$DB_SNAPSHOT" =~ ^[0-9A-Fa-f]+-[0-9A-Fa-f]+-[0-9]+$ ]] || { echo "backup: invalid snapshot identifier" >&2; exit 1; }
++docker exec gbrain-postgres pg_dump -U "$GBRAIN_POSTGRES_USER" -d "$GBRAIN_POSTGRES_DB" --snapshot="$DB_SNAPSHOT" --format=custom --no-owner --no-privileges > "$GENERATION_DIR/gbrain.dump"
+ pg_restore --list "$GENERATION_DIR/gbrain.dump" >/dev/null
+-
+-DB_COUNTS="$(docker exec gbrain-postgres psql -X -v ON_ERROR_STOP=1 -U "$GBRAIN_POSTGRES_USER" -d "$GBRAIN_POSTGRES_DB" -At -F, -c "select (select count(*) from pages),(select count(*) from content_chunks),(select count(*) from content_chunks where embedding is not null),(select count(*) from facts);")"
++printf '%s\n' 'select (select count(*) from pages),(select count(*) from content_chunks),(select count(*) from content_chunks where embedding is not null),(select count(*) from facts);' 'select coalesce(max(vector_dims(embedding)),0) from content_chunks where embedding is not null;' 'COMMIT;' '\q' >&"$SNAPSHOT_WRITE_FD"
++read -r -t 120 DB_COUNTS <&"$SNAPSHOT_READ_FD"
++read -r -t 120 EMBEDDING_DIMENSIONS <&"$SNAPSHOT_READ_FD"
++exec {SNAPSHOT_WRITE_FD}>&-
++SNAPSHOT_WRITE_FD=""
++exec {SNAPSHOT_READ_FD}<&-
++wait "$SNAPSHOT_KEEPER_PID"
++SNAPSHOT_KEEPER_PID=""
+ IFS=, read -r PAGE_COUNT CHUNK_COUNT EMBEDDED_CHUNK_COUNT FACT_COUNT <<<"$DB_COUNTS"
+-EMBEDDING_DIMENSIONS="$(docker exec gbrain-postgres psql -X -v ON_ERROR_STOP=1 -U "$GBRAIN_POSTGRES_USER" -d "$GBRAIN_POSTGRES_DB" -At -c "select coalesce(max(vector_dims(embedding)),0) from content_chunks where embedding is not null;")"
+ DATABASE_SIZE_BYTES="$(docker exec gbrain-postgres psql -X -v ON_ERROR_STOP=1 -U "$GBRAIN_POSTGRES_USER" -d "$GBRAIN_POSTGRES_DB" -At -c "select pg_database_size(current_database());")"
+ POSTGRES_VERSION="$(docker exec gbrain-postgres psql -X -v ON_ERROR_STOP=1 -U "$GBRAIN_POSTGRES_USER" -d "$GBRAIN_POSTGRES_DB" -At -c "show server_version;")"
+ GBRAIN_VERSION="$(gbrain --version | head -n 1 | tr -d '\r')"
+@@ -105,6 +126,7 @@
+   "backup_kind": "gbrain-postgres-and-brain-repo",
+   "database_dump": "gbrain.dump",
+   "database_dump_format": "postgres-custom",
++  "database_counts_share_dump_snapshot": true,
+   "database_dump_sha256": "$DB_SHA256",
+   "brain_repo_archive": "brain-repo.tar.gz",
+   "brain_repo_sha256": "$REPO_SHA256",
