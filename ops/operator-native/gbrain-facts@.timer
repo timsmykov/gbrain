@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly native GBrain atom extraction for %i
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=20min
+Persistent=false
+Unit=gbrain-facts@%i.service
+
+[Install]
+WantedBy=timers.target
