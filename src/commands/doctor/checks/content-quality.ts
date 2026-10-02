@@ -104,7 +104,7 @@ async function runContentSanity(ctx: DoctorContext): Promise<Check[]> {
     // #1871: engine.executeRaw, not the dead-on-PGLite postgres singleton.
     const rows = scanLimit
       ? await engine.executeRaw(
-          `SELECT p.slug, p.source_id, p.title,
+          `SELECT p.slug, p.source_id, p.title, p.type AS page_kind,
                   LEFT(p.compiled_truth, 2048) AS body_head,
                   LEFT(COALESCE(p.timeline, ''), 1024) AS tl_head,
                   p.frontmatter
@@ -115,7 +115,7 @@ async function runContentSanity(ctx: DoctorContext): Promise<Check[]> {
           [scanLimit],
         )
       : await engine.executeRaw(
-          `SELECT p.slug, p.source_id, p.title,
+          `SELECT p.slug, p.source_id, p.title, p.type AS page_kind,
                   LEFT(p.compiled_truth, 2048) AS body_head,
                   LEFT(COALESCE(p.timeline, ''), 1024) AS tl_head,
                   p.frontmatter
@@ -123,12 +123,13 @@ async function runContentSanity(ctx: DoctorContext): Promise<Check[]> {
             WHERE p.deleted_at IS NULL`,
         );
     const hits: Array<{ slug: string; matched: string[] }> = [];
-    const scanRows = rows as unknown as Array<{ slug: string; source_id: string; title: string; body_head: string; tl_head: string; frontmatter: Record<string, unknown> | null }>;
+    const scanRows = rows as unknown as Array<{ slug: string; source_id: string; title: string; page_kind: string; body_head: string; tl_head: string; frontmatter: Record<string, unknown> | null }>;
     for (const r of scanRows) {
       const sanity = assessContentSanity({
         compiled_truth: r.body_head ?? '',
         timeline: r.tl_head ?? '',
         title: r.title ?? '',
+        page_kind: r.page_kind,
         bytes_warn: Number.MAX_SAFE_INTEGER, // we ONLY care about junk-pattern hits here
         bytes_block: Number.MAX_SAFE_INTEGER,
         extra_literals: literals,

@@ -80,6 +80,9 @@ export const DEFAULT_MAX_MARKUP_RATIO = 0.85;
  *  classifier matches this token via regex. */
 export const PAGE_JUNK_PATTERN_CODE = 'PAGE_JUNK_PATTERN';
 
+// Transcript pages preserve quoted incident language verbatim; explicit operator literals still apply.
+const TRANSCRIPT_PAGE_TYPES = new Set(['conversation', 'meeting', 'slack', 'email', 'imessage', 'imessage-daily']);
+
 export type SanityTripReason =
   | 'oversize_warn'      // informational: bytes > bytes_warn but page lands normally
   | 'oversize_block'     // soft-block + flag: write with frontmatter.embed_skip + content_flag
@@ -400,17 +403,19 @@ export function assessContentSanity(opts: {
 
   const disabledPatterns = new Set(opts.disabled_patterns ?? []);
   const junk_pattern_matches: string[] = [];
-  for (const p of BUILT_IN_JUNK_PATTERNS) {
-    if (disabledPatterns.has(p.name)) continue;
-    const scope = p.applies_to ?? 'both';
-    let matched = false;
-    if (scope === 'title' || scope === 'both') {
-      if (p.pattern.test(title)) matched = true;
+  if (!TRANSCRIPT_PAGE_TYPES.has(opts.page_kind ?? '')) {
+    for (const p of BUILT_IN_JUNK_PATTERNS) {
+      if (disabledPatterns.has(p.name)) continue;
+      const scope = p.applies_to ?? 'both';
+      let matched = false;
+      if (scope === 'title' || scope === 'both') {
+        if (p.pattern.test(title)) matched = true;
+      }
+      if (!matched && (scope === 'body' || scope === 'both')) {
+        if (p.pattern.test(bodyHead)) matched = true;
+      }
+      if (matched) junk_pattern_matches.push(p.name);
     }
-    if (!matched && (scope === 'body' || scope === 'both')) {
-      if (p.pattern.test(bodyHead)) matched = true;
-    }
-    if (matched) junk_pattern_matches.push(p.name);
   }
 
   const literal_substring_matches: string[] = [];

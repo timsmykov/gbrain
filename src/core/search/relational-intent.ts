@@ -71,6 +71,7 @@ export const KNOWN_LINK_TYPES: ReadonlySet<string> = new Set([
   'invested_in',
   'advises',
   'works_at',
+  'works_on',
   'attended',
   'yc_partner',
   'led_round',
@@ -258,6 +259,14 @@ function buildPatterns(vocab?: RelationVocab): CompiledPattern[] {
   patterns.push({
     re: new RegExp(`\\bwhere\\s+(?:does|did|has|is)\\s+${SEED}\\s+(?:work|employed)\\b`, 'i'),
     kind: 'who_rel', linkTypes: ['works_at'], direction: 'out', seedGroups: 1,
+  });
+
+  patterns.push({
+    re: new RegExp(
+      `\\b(?:which|what)\\s+(?:active\\s+)?projects?\\s+(?:does|did|is|has)\\s+${SEED}\\s+(?:work(?:ed|s)? on|working on|lead(?:s|ing)?|own(?:s|ed)?)\\s*\\??$`,
+      'i',
+    ),
+    kind: 'who_rel', linkTypes: ['works_on'], direction: 'out', seedGroups: 1,
   });
 
   // schema-pack extensions: "who <verb> <seed>" for each extra verb.

@@ -18,6 +18,7 @@
 import type { BrainEngine } from '../core/engine.ts';
 import { runMaintenanceSweep, type SweepReport } from '../core/sweep.ts';
 import { setCliExitVerdict } from '../core/cli-force-exit.ts';
+import { withCoordinatedWrite } from '../core/persistence/context.ts';
 
 export const SWEEP_HELP = `gbrain sweep — run the serve-resident maintenance sweep once, locally
 
@@ -95,13 +96,25 @@ export async function runSweep(engine: BrainEngine, args: string[]): Promise<voi
 
   const jsonMode = args.includes('--json');
 
-  const report = await runMaintenanceSweep(engine, {
-    sourceId,
-    ...(budgetMs !== undefined ? { budgetMs } : {}),
-    ...(batchLimit !== undefined ? { batchLimit } : {}),
-    // Progress/diagnostics to stderr — stdout stays clean for --json.
-    log: (msg: string) => process.stderr.write(msg + '\n'),
-  });
+  // A managed Postgres brain rejects direct writes at the database trigger.
+  // The trusted local sweep is the canonical maintenance owner, so establish
+  // the same source-scoped persistence capability used by normal coordinated
+  // writers for the complete bounded pass.
+  const run = (target: BrainEngine) =>
+    runMaintenanceSweep(target, {
+      sourceId,
+      ...(budgetMs !== undefined ? { budgetMs } : {}),
+      ...(batchLimit !== undefined ? { batchLimit } : {}),
+      // Diagnostics go to stderr; stdout stays clean for --json.
+      log: (msg: string) => process.stderr.write(msg + '\n'),
+    });
+  // A zero budget is intentionally query-free (the CLI contract and tests
+  // depend on that), so there is no coordinated write to establish.
+  const report = budgetMs === 0
+    ? await run(engine)
+    : await engine.transaction((tx) =>
+        withCoordinatedWrite(tx, [sourceId], () => run(tx)),
+      );
 
   if (jsonMode) {
     console.log(JSON.stringify(report, null, 2));

@@ -252,6 +252,37 @@ const BACKLINK_BOOST_COEF = 0.05;
 const DEBUG = process.env.GBRAIN_SEARCH_DEBUG === '1';
 
 /**
+ * Installation-level production hardening: when the user's query explicitly asks for a
+ * document class (roadmap/report/runbook/guide), give matching canonical page
+ * types a bounded lexical boost. This fixes the common dense-vector smear where
+ * generic hubs beat the exact operational artifact even though the artifact is
+ * already in the candidate pool. Bounded to 1.35x and only fires on explicit
+ * class words, so ordinary semantic/entity search behavior stays unchanged.
+ */
+export function applyDocumentTypeBoost(results: SearchResult[], query: string): void {
+  const q = query.toLowerCase();
+  for (const r of results) {
+    let factor = 1.0;
+    if (/\broadmaps?\b/.test(q) && r.type === 'roadmap') factor = Math.max(factor, 1.35);
+    if (/\broadmaps?\b/.test(q) && r.slug.toLowerCase().includes('roadmap')) {
+      factor = Math.max(factor, 1.35);
+    }
+    if (/\breports?\b|\bmigration\b|\baudit\b/.test(q) && r.type === 'report') factor = Math.max(factor, 1.25);
+    if (/\brunbooks?\b/.test(q) && r.type === 'runbook') factor = Math.max(factor, 1.30);
+    if (/\bguides?\b/.test(q) && r.type === 'guide') factor = Math.max(factor, 1.20);
+    // Gbrain operational artifacts live under reports/roadmaps even when the
+    // page type alone is insufficient to separate them from generic hubs.
+    if (/\bgbrain\b/.test(q) && /^(reports|roadmaps)\//.test(r.slug)) {
+      factor = Math.max(factor, 1.10);
+    }
+    if (factor !== 1.0) {
+      r.score *= factor;
+      (r as any).document_type_boost = factor;
+    }
+  }
+}
+
+/**
  * Apply backlink boost to a result list in place. Mutates each result's score
  * by (1 + BACKLINK_BOOST_COEF * log(1 + count)). Pure data transform; no DB call.
  * Caller fetches counts via engine.getBacklinkCounts. Counts are keyed by
