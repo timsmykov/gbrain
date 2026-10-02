@@ -1,0 +1,36 @@
+--- a/gbrain-offsite-restore-drill
++++ b/gbrain-offsite-restore-drill
+@@ -68,18 +68,20 @@
+ pg_restore --list "$DUMP" > "$TOC"
+ HNSW_TOC_COUNT="$(grep -Ec 'INDEX public idx_chunks_embedding(_image)? ' "$TOC")"
+ [[ "$HNSW_TOC_COUNT" == "2" ]] || { echo "restore drill: expected HNSW indexes missing from dump catalog" >&2; exit 1; }
+-# The production HNSW index requests about 1 GiB of shared memory during
+-# creation, which exceeds the intentionally small restore-drill container.
+-# Preserve and verify its catalog entry, but skip only that derived index; all
+-# schema, data, constraints, triggers, and remaining indexes are restored.
+-awk '/INDEX public idx_chunks_embedding(_image)? / {print ";" $0; next} {print}' "$TOC" > "$DRILL_DIR/restore.filtered.list"
++# Build both vector indexes during the drill. Serial maintenance avoids the
++# parallel HNSW builder's shared-memory requirement in small Docker /dev/shm.
++# PGOPTIONS applies only to this restore connection, not production sessions.
+ 
+ docker exec gbrain-postgres createdb -U "$GBRAIN_POSTGRES_USER" -T template0 "$RESTORE_DB"
+ DB_CREATED=1
+ docker cp "$DUMP" "gbrain-postgres:$CONTAINER_DUMP" >/dev/null
+-docker cp "$DRILL_DIR/restore.filtered.list" "gbrain-postgres:$CONTAINER_TOC" >/dev/null
+-docker exec gbrain-postgres pg_restore --exit-on-error --no-owner --no-privileges \
++docker cp "$TOC" "gbrain-postgres:$CONTAINER_TOC" >/dev/null
++docker exec -e PGOPTIONS='-c max_parallel_maintenance_workers=0 -c maintenance_work_mem=128MB' gbrain-postgres pg_restore --exit-on-error --no-owner --no-privileges \
+   --use-list "$CONTAINER_TOC" -U "$GBRAIN_POSTGRES_USER" -d "$RESTORE_DB" "$CONTAINER_DUMP" >/dev/null
++
++HNSW_VALID_COUNT="$(docker exec gbrain-postgres psql -X -v ON_ERROR_STOP=1 -U "$GBRAIN_POSTGRES_USER" -d "$RESTORE_DB" -At \
++  -c "select count(*) from pg_index i join pg_class c on c.oid=i.indexrelid where c.relname in ('idx_chunks_embedding','idx_chunks_embedding_image') and i.indisvalid and i.indisready;")"
++[[ "$HNSW_VALID_COUNT" == "2" ]] || { echo "restore drill: restored HNSW indexes are not ready" >&2; exit 1; }
+ 
+ RESTORED_COUNTS="$(docker exec gbrain-postgres psql -X -v ON_ERROR_STOP=1 -U "$GBRAIN_POSTGRES_USER" -d "$RESTORE_DB" -At -F, \
+   -c "select (select count(*) from pages),(select count(*) from content_chunks),(select count(*) from content_chunks where embedding is not null),(select count(*) from facts);")"
+@@ -91,4 +93,4 @@
+ 
+ jq -n --arg status ok --arg archive "$ARCHIVE_NAME" \
+   --argjson pages "$PAGES" --argjson chunks "$CHUNKS" --argjson embedded_chunks "$EMBEDDED" --argjson facts "$FACTS" \
+-  '{status:$status,archive:$archive,pages:$pages,chunks:$chunks,embedded_chunks:$embedded_chunks,facts:$facts,hnsw_catalog_entries_verified:2,hnsw_build_skipped_for_restore_drill:true,temporary_database_removed:true}'
++  '{status:$status,archive:$archive,pages:$pages,chunks:$chunks,embedded_chunks:$embedded_chunks,facts:$facts,hnsw_catalog_entries_verified:2,hnsw_build_skipped_for_restore_drill:false,hnsw_indexes_validated:2,temporary_database_removed:true}'
