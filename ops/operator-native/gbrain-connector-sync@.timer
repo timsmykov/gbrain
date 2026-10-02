@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule native GBrain connector maintenance for %i
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=15min
+RandomizedDelaySec=15s
+Unit=gbrain-connector-sync@%i.service
+
+[Install]
+WantedBy=timers.target

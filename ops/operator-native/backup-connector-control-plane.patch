@@ -1,0 +1,8 @@
+--- gbrain-offsite-backup.sh
++++ gbrain-offsite-backup.sh
+@@ -73,1 +73,1 @@
+-for unit_file in /etc/systemd/system/gbrain-backup.service /etc/systemd/system/gbrain-backup.timer /etc/systemd/system/gbrain-offsite-backup.service /etc/systemd/system/gbrain-offsite-backup.timer /etc/systemd/system/gbrain-offsite-restore-drill.service /etc/systemd/system/gbrain-offsite-restore-drill.timer /etc/systemd/system/gbrain-sync@.service /etc/systemd/system/gbrain-sync@.timer /etc/systemd/system/gbrain-sweep@.service /etc/systemd/system/gbrain-sweep@.timer /etc/systemd/system/gbrain-agent-mcp.service /etc/systemd/system/gbrain-http-mcp.service /etc/systemd/system/gbrain-jobs-supervisor.service; do
++for unit_file in /etc/systemd/system/gbrain-backup.service /etc/systemd/system/gbrain-backup.timer /etc/systemd/system/gbrain-offsite-backup.service /etc/systemd/system/gbrain-offsite-backup.timer /etc/systemd/system/gbrain-offsite-restore-drill.service /etc/systemd/system/gbrain-offsite-restore-drill.timer /etc/systemd/system/gbrain-sync@.service /etc/systemd/system/gbrain-sync@.timer /etc/systemd/system/gbrain-connector-sync@.service /etc/systemd/system/gbrain-connector-sync@.timer /etc/systemd/system/gbrain-sweep@.service /etc/systemd/system/gbrain-sweep@.timer /etc/systemd/system/gbrain-agent-mcp.service /etc/systemd/system/gbrain-http-mcp.service /etc/systemd/system/gbrain-jobs-supervisor.service; do
+@@ -81,1 +81,1 @@
+-for native_path in /root/.gbrain/config.json /root/.gbrain/schema-packs /root/.gbrain/persistence; do
++for native_path in /root/.gbrain/config.json /root/.gbrain/schema-packs /root/.gbrain/persistence /root/.gbrain/credentials.json /root/.gbrain/clones; do
